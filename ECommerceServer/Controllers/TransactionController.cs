@@ -6,6 +6,7 @@ using ECommerceServer.Models;
 using System;
 using System.Linq;
 using ECommerceServer.Models.Enumerations;
+using ECommerceServer.Authorization;
 
 namespace ECommerceServer.Controllers
 {
@@ -19,13 +20,16 @@ namespace ECommerceServer.Controllers
         private readonly IWalletService _walletService;
         private readonly ITransactionService _transactionService;
         private readonly IProductService _productService;
-        public TransactionController(IOrderHistoryService orderHistoryService, IOrderService orderService, IWalletService walletService, ITransactionService transactionService, IProductService productService)
+        private readonly IAuthorizationService _authorizationService;
+        public TransactionController(IOrderHistoryService orderHistoryService, IOrderService orderService, IWalletService walletService, 
+            ITransactionService transactionService, IProductService productService, IAuthorizationService authorizationService)
         {
             _walletService = walletService;
             _orderHistoryService = orderHistoryService;
             _orderService = orderService;
             _transactionService = transactionService;
             _productService = productService;
+            _authorizationService = authorizationService;
         }
         
         [HttpPost]
@@ -36,6 +40,12 @@ namespace ECommerceServer.Controllers
             {
                 try
                 {
+                    var isAuthorized = await _authorizationService.AuthorizeAsync(User, order, AuthorizationOperations.Create);
+                    if (!isAuthorized.Succeeded)
+                    {
+                        return Forbid();
+                    }
+
                     // Product related
                     Product product = await _productService.GetProductByIdAsync(order.ProductId);
                     var quantityAvailable = product.Quantity;
@@ -51,7 +61,7 @@ namespace ECommerceServer.Controllers
                     // Order related 
                     order.DeliveryDate = DateTime.Now.AddDays(product.DeliveryDays);
                     order.OrderPlacementTime = DateTime.Now;
-                    order.Status = OrderStatus.DELEVERING;
+                    order.Status = OrderStatus.DELIVERING;
                     await _orderService.CreateOrderAsync(order);
 
                     // Order History related
@@ -115,7 +125,14 @@ namespace ECommerceServer.Controllers
         [Route("/Order/History/{id:guid}")]
         public async Task<IActionResult> ViewOrderHistory(Guid id)
         {
-            return Ok(await _orderHistoryService.GetOrderHistoryByUserIdAsync(id));
+            var orderHistory = await _orderHistoryService.GetOrderHistoryByUserIdAsync(id);
+            var isAuthorized = await _authorizationService.AuthorizeAsync(User, orderHistory, AuthorizationOperations.Read);
+            if (!isAuthorized.Succeeded)
+            {
+                return Forbid();
+            }
+
+            return Ok(orderHistory);
         }
 
         [HttpPost]
@@ -123,6 +140,11 @@ namespace ECommerceServer.Controllers
         public async Task<IActionResult> ViewOrder(Guid id)
         {
             Order order = await _orderService.GetOrderAsync(id);
+            var isAuthorized = await _authorizationService.AuthorizeAsync(User, order, AuthorizationOperations.Read);
+            if (!isAuthorized.Succeeded)
+            {
+                return Forbid();
+            }
             return Ok(order);
         }
     }

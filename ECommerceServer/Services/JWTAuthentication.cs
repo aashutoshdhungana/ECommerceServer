@@ -14,7 +14,7 @@ namespace ECommerceServer.Services
             _secretKey = secretKey;
         }
 
-        string IJWTAuthentication.Authenticate(string email)
+        string IJWTAuthentication.Authenticate(string email, string UserId)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_secretKey);
@@ -22,7 +22,8 @@ namespace ECommerceServer.Services
             {
                 Subject = new ClaimsIdentity(new Claim[]
                 {
-                    new Claim(ClaimTypes.Email, email)
+                    new Claim(ClaimTypes.Email, email),
+                    new Claim("user-id", UserId),
                 }),
                 Expires = DateTime.UtcNow.AddHours(1),
                 SigningCredentials = new SigningCredentials(

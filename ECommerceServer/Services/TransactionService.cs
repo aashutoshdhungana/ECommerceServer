@@ -32,7 +32,7 @@ namespace ECommerceServer.Services
 
         public IEnumerable<Transaction> GetTransactionsByUserId(Guid userId)
         {
-            return  _context.Transactions.Where(x => x.PayeeId == userId || x.PayeeId == userId ).AsEnumerable();
+            return  _context.Transactions.Where(x => x.PayeeId == userId || x.PayerId == userId ).AsEnumerable();
         }
 
         public async Task<bool> SaveChangesAsync()

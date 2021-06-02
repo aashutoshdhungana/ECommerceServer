@@ -7,6 +7,8 @@ using ECommerceServer.Services;
 using Microsoft.AspNetCore.Mvc;
 using ECommerceServer.Models.DTO.User;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
+using ECommerceServer.Authorization;
 
 namespace ECommerceServer.Controllers
 {
@@ -18,11 +20,13 @@ namespace ECommerceServer.Controllers
         private readonly IJWTAuthentication _auth;
         private readonly IUserService _userService;
         private readonly IMapper _mapper;
-        public AccountController(IJWTAuthentication auth, IUserService userService, IMapper mapper)
+        private readonly IAuthorizationService _authorizationService;
+        public AccountController(IJWTAuthentication auth, IUserService userService, IMapper mapper, IAuthorizationService authorizationService)
         {
             _auth = auth;
             _userService = userService;
             _mapper = mapper;
+            _authorizationService = authorizationService;
         }
 
         [HttpPost]
@@ -38,7 +42,7 @@ namespace ECommerceServer.Controllers
                     if (!UserService.ValidateUser(validuser, user.PassWord))
                         return BadRequest("Incorrect Email or Password");
 
-                    string token = _auth.Authenticate(validuser.Email);
+                    string token = _auth.Authenticate(validuser.Email, validuser.UserId.ToString());
                     var response = UserService.GetReponseUser(validuser, token);
 
                     return Ok(response);
@@ -94,9 +98,16 @@ namespace ECommerceServer.Controllers
             {
                 try
                 {
+                    
                     var validUser = await _userService.GetUserByIdAsync(id);
                     if (validUser == null)
                         return NotFound();
+
+                    var isAuthorized = await _authorizationService.AuthorizeAsync(User, validUser, AuthorizationOperations.Update);
+                    if (!isAuthorized.Succeeded)
+                    {
+                        return Forbid();
+                    }
 
                     var userModel = _mapper.Map(user, validUser);
                     _userService.UpdateUser(userModel);
@@ -128,6 +139,12 @@ namespace ECommerceServer.Controllers
                     {
                         return NotFound("User Not Found");
                     }
+
+                    var isAuthorized = await _authorizationService.AuthorizeAsync(User, userModel, AuthorizationOperations.Delete);
+                    if (!isAuthorized.Succeeded)
+                    {
+                        return Forbid();
+                    }
                     _userService.DeleteUser(userModel);
                     await _userService.SaveChangesAsync();
 
@@ -154,6 +171,15 @@ namespace ECommerceServer.Controllers
                 try
                 {
                     User validUser = await _userService.GetUserByIdAsync(id);
+                    if (validUser == null)
+                    {
+                        return BadRequest("User Not found");
+                    }
+                    var isAuthorized = await _authorizationService.AuthorizeAsync(User, validUser, AuthorizationOperations.Update);
+                    if (!isAuthorized.Succeeded)
+                    {
+                        return Forbid();
+                    }
                     if (!UserService.ValidateUser(validUser, userPasswordDOT.OldPassword))
                     {
                         return BadRequest("Incorret Old Password");

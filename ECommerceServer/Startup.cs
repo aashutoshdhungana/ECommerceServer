@@ -11,6 +11,8 @@ using Microsoft.Extensions.Configuration;
 using ECommerceServer.Models.Validations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using ECommerceServer.Authorization;
 
 namespace ECommerceServer
 {
@@ -47,7 +49,10 @@ namespace ECommerceServer
                     ValidateAudience = false
                 };
             });
-
+            services.AddSingleton<IAuthorizationHandler, UserDataAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, ProductDataAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, OrderDataAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, OrderHistoryDataAuthorizationHandler>();
             services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
             services.AddSingleton<IJWTAuthentication>(new JWTAuthentication(tokenKey));
             services.AddScoped<IWalletService, WalletService>();

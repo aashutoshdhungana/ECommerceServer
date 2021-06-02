@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using ECommerceServer.Services;
 using Microsoft.AspNetCore.Authorization;
 using ECommerceServer.Models.ViewModel;
+using ECommerceServer.Authorization;
 
 namespace ECommerceServer.Controllers
 {
@@ -18,11 +19,13 @@ namespace ECommerceServer.Controllers
         private readonly IProductService _productService;
         private readonly IUserService _userService;
         private readonly IMapper _mapper;
-        public ProductController(IMapper mapper, IProductService productService, IUserService userService)
+        private readonly IAuthorizationService _authorizationService;
+        public ProductController(IMapper mapper, IProductService productService, IUserService userService, IAuthorizationService authorizationService)
         {
             _productService = productService;
             _mapper = mapper;
             _userService = userService;
+            _authorizationService = authorizationService;
         }
 
         [HttpPost]
@@ -31,7 +34,11 @@ namespace ECommerceServer.Controllers
         {
             if (ModelState.IsValid)
             {
-
+                var isAuthorized = await _authorizationService.AuthorizeAsync(User, product, AuthorizationOperations.Create);
+                if (!isAuthorized.Succeeded)
+                {
+                    return Forbid();
+                }
                 await _productService.CreateProductAsync(product);
                 await _productService.SaveChangeAsync();
                 return Ok("Created product successfully");
@@ -55,6 +62,11 @@ namespace ECommerceServer.Controllers
                     var validProduct = await _productService.GetProductByIdAsync(id);
                     if (validProduct == null)
                         return NotFound();
+                    var isAuthorized = await _authorizationService.AuthorizeAsync(User, validProduct, AuthorizationOperations.Update);
+                    if (!isAuthorized.Succeeded)
+                    {
+                        return Forbid();
+                    }
                     var productModel = _mapper.Map(product, validProduct);
                     _productService.UpdateProduct(productModel);
                     await _productService.SaveChangeAsync();
@@ -84,6 +96,13 @@ namespace ECommerceServer.Controllers
                     var validProduct = await _productService.GetProductByIdAsync(id);
                     if (validProduct == null)
                         return NotFound();
+
+                    var isAuthorized = await _authorizationService.AuthorizeAsync(User, validProduct, AuthorizationOperations.Delete);
+                    if (!isAuthorized.Succeeded)
+                    {
+                        return Forbid();
+                    }
+
                     _productService.DeleteProduct(validProduct);
                     await _productService.SaveChangeAsync();
                     return Ok("Product Deleted Successfully");
@@ -111,6 +130,12 @@ namespace ECommerceServer.Controllers
                 if (product == null)
                 {
                     return NotFound();
+                }
+
+                var isAuthorized = await _authorizationService.AuthorizeAsync(User, product, AuthorizationOperations.Read);
+                if (!isAuthorized.Succeeded)
+                {
+                    return Forbid();
                 }
 
                 User user = await _userService.GetUserByIdAsync(product.UserId);
